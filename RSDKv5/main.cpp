@@ -27,6 +27,8 @@ ModLoader *ModLoaderData;
 char modPath[MAX_PATH];
 bool entryCalled = false;
 
+HMODULE DllHandle = NULL;
+
 // Steam links
 #ifdef STEAM_API_NODLL
 HMODULE steamAPIHandle = nullptr;

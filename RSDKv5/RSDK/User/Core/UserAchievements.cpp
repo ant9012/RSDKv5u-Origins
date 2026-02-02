@@ -15,7 +15,7 @@ namespace SKU
 
 // Steam API
 #if RETRO_USERCORE_STEAM
-#include "steam_api.h"
+// #include "steam_api.h"
 #include "RSDK/User/Steam/SteamAchievements.cpp"
 #endif
 

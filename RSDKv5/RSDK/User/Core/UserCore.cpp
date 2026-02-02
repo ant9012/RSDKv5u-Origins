@@ -2,7 +2,7 @@
 #include "iniparser/iniparser.h"
 
 #if RETRO_USERCORE_STEAM
-#include "steam_api.h"
+// #include "steam_api.h"
 #endif
 
 #if RETRO_USERCORE_EOS

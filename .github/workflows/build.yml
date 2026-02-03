@@ -1,4 +1,4 @@
-name: Build RSDKv5U (Steal Dependencies)
+name: Build RSDKv5U (MSYS2 + Fixes)
 
 on:
   push:
@@ -8,53 +8,55 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    
+    defaults:
+      run:
+        shell: msys2 {0}  # CRITICAL: This runs all steps inside the MinGW environment
 
     steps:
-    # 1. Checkout YOUR code (the fork you want to compile)
-    - name: Checkout Main Code
+    - name: Checkout Code
       uses: actions/checkout@v4
       with:
-        path: main_source
+        submodules: false
 
-    # 2. Checkout the PARENT code (thesupersonic16) just to get the working dependencies
-    - name: Checkout Dependency Source
-      uses: actions/checkout@v4
+    # 1. SETUP ENVIRONMENT (The Official Method)
+    # We install the exact libraries the repo needs so CMake finds them 
+    # and DOES NOT try to compile them from the missing source folders.
+    - name: Setup MSYS2
+      uses: msys2/setup-msys2@v2
       with:
-        repository: thesupersonic16/RSDKv5u-Origins
-        submodules: recursive
-        path: dep_source
+        msystem: MINGW32  # We use 32-bit MinGW as requested by the repo
+        update: true
+        install: >-
+          git
+          make
+          mingw-w64-i686-toolchain
+          mingw-w64-i686-cmake
+          mingw-w64-i686-libogg
+          mingw-w64-i686-libvorbis
+          mingw-w64-i686-libtheora
+          mingw-w64-i686-tinyxml2
 
-    # 3. Move the working dependencies into your source folder
-    - name: Move Dependencies
-      shell: bash
+    # 2. MANUAL FIX FOR TINYXML2
+    # Even with MSYS2, this fork often hardcodes the path to TinyXML2 source.
+    # We clone it just in case to prevent the "Cannot find tinyxml2.cpp" error.
+    - name: Fix TinyXML2
       run: |
-        echo "Moving dependencies from parent repo..."
-        # Remove any empty dependency folders in your repo
-        rm -rf main_source/dependencies
-        
-        # Copy the fully populated dependencies folder from the parent repo
-        cp -r dep_source/dependencies main_source/dependencies
-        
-        # Verify the file causing the error exists now
-        if [ -f "main_source/dependencies/android/libtheora/lib/cpu.c" ]; then
-            echo "cpu.c found! The fix worked."
-        else
-            echo "Warning: cpu.c still missing, but attempting build anyway..."
-        fi
+        mkdir -p dependencies/all/tinyxml2
+        git clone https://github.com/leethomason/tinyxml2.git dependencies/all/tinyxml2 || true
 
-    # 4. Configure CMake (using your source code)
+    # 3. CONFIGURE CMAKE
+    # We use "MinGW Makefiles" generator because we are in MSYS2 now.
     - name: Configure CMake
-      run: cmake -B build -DRETRO_REVISION=3
-      working-directory: main_source
+      run: cmake -G "MinGW Makefiles" -B build -DRETRO_REVISION=3 -DCMAKE_BUILD_TYPE=Release
 
-    # 5. Build
+    # 4. BUILD
     - name: Build
-      run: cmake --build build --config Release
-      working-directory: main_source
+      run: cmake --build build
 
-    # 6. Upload
+    # 5. UPLOAD
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
         name: RSDKv5U-Windows
-        path: main_source/build/Release/*.exe
+        path: build/*.exe

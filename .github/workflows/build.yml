@@ -1,4 +1,4 @@
-name: Build RSDKv5U
+name: Build RSDKv5U (Manual Deps)
 
 on:
   push:
@@ -10,23 +10,37 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    # 1. Download the code
+    # 1. Checkout the source code
     - name: Checkout Code
       uses: actions/checkout@v4
-      with:
-        submodules: recursive  # Essential for RSDKv5 dependencies
+      
+    # 2. MANUALLY DOWNLOAD MISSING LIBRARIES
+    # The repo doesn't have these, so we clone them from the official creators (Xiph.org)
+    # into the exact folder the CMakeLists.txt is complaining about.
+    - name: Install Dependencies
+      run: |
+        # Make the directory
+        mkdir -p dependencies/windows
+        
+        # Clone Ogg
+        git clone https://github.com/xiph/ogg.git dependencies/windows/libogg
+        
+        # Clone Vorbis
+        git clone https://github.com/xiph/vorbis.git dependencies/windows/libvorbis
+        
+        # Clone Theora
+        git clone https://github.com/xiph/theora.git dependencies/windows/libtheora
 
-    # 2. Configure the build
-    # We use the built-in 'cmake' command.
-    # -DRETRO_REVISION=3 is the flag that enables "Origins/Ultimate" mode.
+    # 3. Configure CMake
+    # -DRETRO_REVISION=3 ensures it compiles for Sonic Origins (Ultimate)
     - name: Configure CMake
       run: cmake -B build -DRETRO_REVISION=3
 
-    # 3. Compile the code
+    # 4. Compile the Exe
     - name: Build
       run: cmake --build build --config Release
 
-    # 4. Save the Result
+    # 5. Upload the Result
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:

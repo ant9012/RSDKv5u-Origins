@@ -1,62 +1,99 @@
-name: Build RSDKv5U (MSYS2 + Fixes)
+name: Build RSDKv5
 
-on:
-  push:
-    branches: [ "master", "main" ]
-  workflow_dispatch:
+on: workflow_dispatch
+
+# each artifact is like 15MB so we'll start by only doing it manually
+# on:
+#   push:
+#     branches:
+#       - master
+
+# TODO: readd with: submodules: recursive once we can
 
 jobs:
-  build:
-    runs-on: windows-latest
-    
+  v5-windows:
+    runs-on: windows-2022
     defaults:
       run:
-        shell: msys2 {0}  # CRITICAL: This runs all steps inside the MinGW environment
-
+        shell: msys2 {0}
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
-      with:
-        submodules: false
-
-    # 1. SETUP ENVIRONMENT (The Official Method)
-    # We install the exact libraries the repo needs so CMake finds them 
-    # and DOES NOT try to compile them from the missing source folders.
-    - name: Setup MSYS2
-      uses: msys2/setup-msys2@v2
-      with:
-        msystem: MINGW32  # We use 32-bit MinGW as requested by the repo
-        update: true
-        install: >-
-          git
-          make
-          mingw-w64-i686-toolchain
-          mingw-w64-i686-cmake
-          mingw-w64-i686-libogg
-          mingw-w64-i686-libvorbis
-          mingw-w64-i686-libtheora
-          mingw-w64-i686-tinyxml2
-
-    # 2. MANUAL FIX FOR TINYXML2
-    # Even with MSYS2, this fork often hardcodes the path to TinyXML2 source.
-    # We clone it just in case to prevent the "Cannot find tinyxml2.cpp" error.
-    - name: Fix TinyXML2
-      run: |
-        mkdir -p dependencies/all/tinyxml2
-        git clone https://github.com/leethomason/tinyxml2.git dependencies/all/tinyxml2 || true
-
-    # 3. CONFIGURE CMAKE
-    # We use "MinGW Makefiles" generator because we are in MSYS2 now.
-    - name: Configure CMake
-      run: cmake -G "MinGW Makefiles" -B build -DRETRO_REVISION=3 -DCMAKE_BUILD_TYPE=Release
-
-    # 4. BUILD
-    - name: Build
-      run: cmake --build build
-
-    # 5. UPLOAD
-    - name: Upload Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: RSDKv5U-Windows
-        path: build/*.exe
+      - name: Checkout 
+        uses: actions/checkout@v2
+        with:
+          submodules: recursive
+      - name: Setup MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW32
+          update: true
+          install: pkg-config make git mingw-w64-i686-gcc mingw-w64-i686-libogg mingw-w64-i686-libtheora
+      - name: Build RSDKv5 + U
+        run: |
+          make -j8 RSDK_ONLY=1 AUTOBUILD=1
+          make -j8 clean-rsdk
+          make -j8 RSDK_ONLY=1 RSDK_REVISION=3 AUTOBUILD=1
+      - name: Move artifacts
+        run: |
+          mkdir artifacts
+          mv ./bin/Windows/DX9/*.exe ./artifacts
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v1.0.0
+        with:
+          name: v5-windows
+          path: artifacts
+  v5-windows-x64:
+    runs-on: windows-2022
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - name: Checkout 
+        uses: actions/checkout@v2
+        with:
+          submodules: recursive
+      - name: Setup MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: pkg-config make git mingw-w64-x86_64-gcc mingw-w64-x86_64-SDL2 mingw-w64-x86_64-libogg mingw-w64-x86_64-libtheora
+      - name: Build RSDKv5 + U
+        run: |
+          make -j8 RSDK_ONLY=1 AUTOBUILD=1
+          make -j8 clean-rsdk
+          make -j8 RSDK_ONLY=1 RSDK_REVISION=3 AUTOBUILD=1
+      - name: Move artifacts
+        run: |
+          mkdir artifacts
+          mv ./bin/Windows/DX9/*.exe ./artifacts
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v1.0.0
+        with:
+          name: v5-windows-x64
+          path: artifacts
+  v5-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout 
+        uses: actions/checkout@v2
+        with:
+          submodules: recursive
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install libogg-dev libsdl2-dev libtheora-dev libglew-dev libglfw3-dev
+      - name: Build RSDKv5 + U OGL
+        run: |
+          make -j8 RSDK_ONLY=1 AUTOBUILD=1
+          make -j8 clean-rsdk
+          make -j8 RSDK_ONLY=1 RSDK_REVISION=3 AUTOBUILD=1
+      - name: Build RSDKv5 + U SDL2
+        run: |
+          make -j8 RSDK_ONLY=1 SUBSYSTEM=SDL2 AUTOBUILD=1
+          make -j8 clean-rsdk
+          make -j8 RSDK_ONLY=1 SUBSYSTEM=SDL2 RSDK_REVISION=3 AUTOBUILD=1
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v1.0.0
+        with:
+          name: v5-linux
+          path: bin/Linux

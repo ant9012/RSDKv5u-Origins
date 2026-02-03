@@ -1,4 +1,4 @@
-name: Build RSDKv5U (Bash Fix)
+name: Build RSDKv5U (Ultimate Fix)
 
 on:
   push:
@@ -12,29 +12,39 @@ jobs:
     steps:
     - name: Checkout Code
       uses: actions/checkout@v4
-
-    # FIX: We add "shell: bash" here. 
-    # This allows 'mkdir -p' to work correctly (ignoring the folder if it exists)
-    # and prevents PowerShell errors.
+      
     - name: Install Dependencies
       shell: bash
       run: |
-        # 1. Safely create the directory (won't error if it already exists)
+        # 1. Create all necessary folders
         mkdir -p dependencies/windows
+        mkdir -p dependencies/all
+        mkdir -p dependencies/android
         
-        # 2. Clone the libraries
-        # We check if the folder exists first to avoid "already exists" errors during cloning
+        # 2. Fix TinyXML2 (Missing Error #1)
+        # The build looks for dependencies/all/tinyxml2/tinyxml2.cpp
+        if [ ! -d "dependencies/all/tinyxml2" ]; then
+            git clone https://github.com/leethomason/tinyxml2.git dependencies/all/tinyxml2
+        fi
+
+        # 3. Fix LibTheora (Missing Error #2)
+        # The build weirdly looks for dependencies/android/libtheora/lib/analyze.c
+        if [ ! -d "dependencies/android/libtheora" ]; then
+            git clone https://github.com/xiph/theora.git dependencies/android/libtheora
+        fi
+
+        # 4. Ensure Windows Audio Libs exist (Just in case)
         if [ ! -d "dependencies/windows/libogg" ]; then
-          git clone https://github.com/xiph/ogg.git dependencies/windows/libogg
+            git clone https://github.com/xiph/ogg.git dependencies/windows/libogg
         fi
         
         if [ ! -d "dependencies/windows/libvorbis" ]; then
-          git clone https://github.com/xiph/vorbis.git dependencies/windows/libvorbis
+            git clone https://github.com/xiph/vorbis.git dependencies/windows/libvorbis
         fi
-        
-        if [ ! -d "dependencies/windows/libtheora" ]; then
-          git clone https://github.com/xiph/theora.git dependencies/windows/libtheora
-        fi
+
+        # 5. Fix potential missing header issue for Theora
+        # Sometimes the 'android' path causes an include error, so we copy headers to windows too
+        cp -r dependencies/android/libtheora dependencies/windows/libtheora || true
 
     - name: Configure CMake
       run: cmake -B build -DRETRO_REVISION=3

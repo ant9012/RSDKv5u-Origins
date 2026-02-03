@@ -10,22 +10,23 @@ jobs:
     runs-on: windows-latest
 
     steps:
+    # 1. Download the code
     - name: Checkout Code
       uses: actions/checkout@v4
       with:
-        submodules: recursive  # Crucial for RSDKv5 dependencies!
+        submodules: recursive  # Essential for RSDKv5 dependencies
 
-    - name: Setup CMake
-      uses: jwlawles/cmake-build-action@v1
-      with:
-        cmake-version: 'latest'
-
-    - name: Configure CMake (Origins Mode)
+    # 2. Configure the build
+    # We use the built-in 'cmake' command.
+    # -DRETRO_REVISION=3 is the flag that enables "Origins/Ultimate" mode.
+    - name: Configure CMake
       run: cmake -B build -DRETRO_REVISION=3
 
+    # 3. Compile the code
     - name: Build
       run: cmake --build build --config Release
 
+    # 4. Save the Result
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:

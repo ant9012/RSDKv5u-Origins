@@ -1,4 +1,4 @@
-name: Build RSDKv5U (Ultimate Fix)
+name: Build RSDKv5U
 
 on:
   push:
@@ -12,39 +12,38 @@ jobs:
     steps:
     - name: Checkout Code
       uses: actions/checkout@v4
-      
-    - name: Install Dependencies
+      with:
+        submodules: false # We will handle dependencies manually
+
+    - name: Force Install Dependencies
       shell: bash
       run: |
-        # 1. Create all necessary folders
-        mkdir -p dependencies/windows
+        # 1. DELETE EXISTING FOLDERS (The Fix)
+        # This ensures we don't skip downloading just because an empty folder exists.
+        rm -rf dependencies/all/tinyxml2
+        rm -rf dependencies/android/libtheora
+        rm -rf dependencies/windows
+        
+        # 2. Re-create directories
         mkdir -p dependencies/all
         mkdir -p dependencies/android
-        
-        # 2. Fix TinyXML2 (Missing Error #1)
-        # The build looks for dependencies/all/tinyxml2/tinyxml2.cpp
-        if [ ! -d "dependencies/all/tinyxml2" ]; then
-            git clone https://github.com/leethomason/tinyxml2.git dependencies/all/tinyxml2
-        fi
+        mkdir -p dependencies/windows
 
-        # 3. Fix LibTheora (Missing Error #2)
-        # The build weirdly looks for dependencies/android/libtheora/lib/analyze.c
-        if [ ! -d "dependencies/android/libtheora" ]; then
-            git clone https://github.com/xiph/theora.git dependencies/android/libtheora
-        fi
+        # 3. Clone TinyXML2 (Fixes 'dependencies/all/tinyxml2/tinyxml2.cpp' error)
+        echo "Cloning TinyXML2..."
+        git clone https://github.com/leethomason/tinyxml2.git dependencies/all/tinyxml2
 
-        # 4. Ensure Windows Audio Libs exist (Just in case)
-        if [ ! -d "dependencies/windows/libogg" ]; then
-            git clone https://github.com/xiph/ogg.git dependencies/windows/libogg
-        fi
-        
-        if [ ! -d "dependencies/windows/libvorbis" ]; then
-            git clone https://github.com/xiph/vorbis.git dependencies/windows/libvorbis
-        fi
+        # 4. Clone Theora to Android folder (Fixes 'dependencies/android/libtheora/lib/cpu.c' error)
+        # The build script strangely forces this path.
+        echo "Cloning Theora (Android path)..."
+        git clone https://github.com/xiph/theora.git dependencies/android/libtheora
 
-        # 5. Fix potential missing header issue for Theora
-        # Sometimes the 'android' path causes an include error, so we copy headers to windows too
-        cp -r dependencies/android/libtheora dependencies/windows/libtheora || true
+        # 5. Clone Windows Audio Libraries (Fixes Ogg/Vorbis errors)
+        echo "Cloning Ogg/Vorbis..."
+        git clone https://github.com/xiph/ogg.git dependencies/windows/libogg
+        git clone https://github.com/xiph/vorbis.git dependencies/windows/libvorbis
+        # Clone Theora to windows folder too, just to be safe
+        git clone https://github.com/xiph/theora.git dependencies/windows/libtheora
 
     - name: Configure CMake
       run: cmake -B build -DRETRO_REVISION=3

@@ -1,4 +1,4 @@
-name: Build RSDKv5U
+name: Build RSDKv5U (Steal Dependencies)
 
 on:
   push:
@@ -10,49 +10,51 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - name: Checkout Code
+    # 1. Checkout YOUR code (the fork you want to compile)
+    - name: Checkout Main Code
       uses: actions/checkout@v4
       with:
-        submodules: false # We will handle dependencies manually
+        path: main_source
 
-    - name: Force Install Dependencies
+    # 2. Checkout the PARENT code (thesupersonic16) just to get the working dependencies
+    - name: Checkout Dependency Source
+      uses: actions/checkout@v4
+      with:
+        repository: thesupersonic16/RSDKv5u-Origins
+        submodules: recursive
+        path: dep_source
+
+    # 3. Move the working dependencies into your source folder
+    - name: Move Dependencies
       shell: bash
       run: |
-        # 1. DELETE EXISTING FOLDERS (The Fix)
-        # This ensures we don't skip downloading just because an empty folder exists.
-        rm -rf dependencies/all/tinyxml2
-        rm -rf dependencies/android/libtheora
-        rm -rf dependencies/windows
+        echo "Moving dependencies from parent repo..."
+        # Remove any empty dependency folders in your repo
+        rm -rf main_source/dependencies
         
-        # 2. Re-create directories
-        mkdir -p dependencies/all
-        mkdir -p dependencies/android
-        mkdir -p dependencies/windows
+        # Copy the fully populated dependencies folder from the parent repo
+        cp -r dep_source/dependencies main_source/dependencies
+        
+        # Verify the file causing the error exists now
+        if [ -f "main_source/dependencies/android/libtheora/lib/cpu.c" ]; then
+            echo "cpu.c found! The fix worked."
+        else
+            echo "Warning: cpu.c still missing, but attempting build anyway..."
+        fi
 
-        # 3. Clone TinyXML2 (Fixes 'dependencies/all/tinyxml2/tinyxml2.cpp' error)
-        echo "Cloning TinyXML2..."
-        git clone https://github.com/leethomason/tinyxml2.git dependencies/all/tinyxml2
-
-        # 4. Clone Theora to Android folder (Fixes 'dependencies/android/libtheora/lib/cpu.c' error)
-        # The build script strangely forces this path.
-        echo "Cloning Theora (Android path)..."
-        git clone https://github.com/xiph/theora.git dependencies/android/libtheora
-
-        # 5. Clone Windows Audio Libraries (Fixes Ogg/Vorbis errors)
-        echo "Cloning Ogg/Vorbis..."
-        git clone https://github.com/xiph/ogg.git dependencies/windows/libogg
-        git clone https://github.com/xiph/vorbis.git dependencies/windows/libvorbis
-        # Clone Theora to windows folder too, just to be safe
-        git clone https://github.com/xiph/theora.git dependencies/windows/libtheora
-
+    # 4. Configure CMake (using your source code)
     - name: Configure CMake
       run: cmake -B build -DRETRO_REVISION=3
+      working-directory: main_source
 
+    # 5. Build
     - name: Build
       run: cmake --build build --config Release
+      working-directory: main_source
 
+    # 6. Upload
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
         name: RSDKv5U-Windows
-        path: build/Release/*.exe
+        path: main_source/build/Release/*.exe

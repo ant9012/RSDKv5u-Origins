@@ -1,4 +1,4 @@
-name: Build RSDKv5U (Manual Deps)
+name: Build RSDKv5U (Bash Fix)
 
 on:
   push:
@@ -10,37 +10,38 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    # 1. Checkout the source code
     - name: Checkout Code
       uses: actions/checkout@v4
-      
-    # 2. MANUALLY DOWNLOAD MISSING LIBRARIES
-    # The repo doesn't have these, so we clone them from the official creators (Xiph.org)
-    # into the exact folder the CMakeLists.txt is complaining about.
+
+    # FIX: We add "shell: bash" here. 
+    # This allows 'mkdir -p' to work correctly (ignoring the folder if it exists)
+    # and prevents PowerShell errors.
     - name: Install Dependencies
+      shell: bash
       run: |
-        # Make the directory
+        # 1. Safely create the directory (won't error if it already exists)
         mkdir -p dependencies/windows
         
-        # Clone Ogg
-        git clone https://github.com/xiph/ogg.git dependencies/windows/libogg
+        # 2. Clone the libraries
+        # We check if the folder exists first to avoid "already exists" errors during cloning
+        if [ ! -d "dependencies/windows/libogg" ]; then
+          git clone https://github.com/xiph/ogg.git dependencies/windows/libogg
+        fi
         
-        # Clone Vorbis
-        git clone https://github.com/xiph/vorbis.git dependencies/windows/libvorbis
+        if [ ! -d "dependencies/windows/libvorbis" ]; then
+          git clone https://github.com/xiph/vorbis.git dependencies/windows/libvorbis
+        fi
         
-        # Clone Theora
-        git clone https://github.com/xiph/theora.git dependencies/windows/libtheora
+        if [ ! -d "dependencies/windows/libtheora" ]; then
+          git clone https://github.com/xiph/theora.git dependencies/windows/libtheora
+        fi
 
-    # 3. Configure CMake
-    # -DRETRO_REVISION=3 ensures it compiles for Sonic Origins (Ultimate)
     - name: Configure CMake
       run: cmake -B build -DRETRO_REVISION=3
 
-    # 4. Compile the Exe
     - name: Build
       run: cmake --build build --config Release
 
-    # 5. Upload the Result
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
